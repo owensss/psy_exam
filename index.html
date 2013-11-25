@@ -10,17 +10,25 @@
     <!--[if vml]><style>vml\:* {behavior: url(#default#VML);}</style><![endif]-->
     <script type="text/javascript" src="./jsgl.min.js"></script>
     </head>
-    <body  onclick="getXY()">
+    <body>
     <!-- 在这里设置界面的 高和宽 -->
+    <button type="button" id="button" onclick="btn_start()">开始</button>
+    <div id="rest_notice" style="display:none">请休息一下，一分钟后再开始</div>
+    <div onclick="getXY()">
     <div id="panel" style="width: 1000px; height: 1000px""></div>
-
     <audio src="beep.wav" autostart="false" width="0" height="0" id="beep" enablejavascript="true">
     <script type="text/javascript">
-            
+    
+    var g_rest_time = 6000 ;// 60 * 100000; // 每次休息 60秒
+    var g_v = 0.1; // 速度
+    var g_duration_random = 500; // 在鸣笛前小球先 运动(0, 1000) 微秒，加上
+    var g_duration_const  = 3000; // 在鸣笛前小球固定运动 3000 微秒
     var g_time = 30; // 每个方向 30 次
-    var g_rest = 60; // 每 60 次休息一下
+    var g_rest = 2 // 60; // 每 60 次休息一下
     var g_order = new Array(); // 存 30*8 =240 次模拟的顺序
-    var g_delays = new Array();
+    var g_delays = new Array(); // 存每次模拟的时间
+    var g_x = 500; // 小球运动起点 x 坐标 (px)
+    var g_y = 500; // 小球运动起点 y 坐标 (px)
     
     /**
      * 这必将成为一个耦合度极高，无法修改的代码
@@ -44,12 +52,17 @@
         // x -= gCanvasElement.offsetLeft;
         // y -= gCanvasElement.offsetTop;
         if (g_accept_click && g_state == State.animated_wait) {
-            console.log("click "+g_current+"\t"+x+", "+y); // 写入
+            console.log("click at\t"+x+", "+y); // 写入
             g_accept_click = false; // 拒绝用户再次点击
-            loop_controller(); // 处理完事情了，把控制权交给 loop_controller
+            switch_state(Transition.clicked); // 处理完事情了，转换状态
 
         }
     }
+    
+    var btn_start = function() {
+        switch_state(Transition.start_animate);
+    }
+    
     var PlaySound =function(soundObj) {
         var sound = document.getElementById(soundObj);
         sound.play();
@@ -72,7 +85,7 @@
      */
     var Transition = {
         start_animate : 0, // 开始下一个模拟 (等待中 -> 模拟中)
-        end_loop : 3, // 当前模拟结束 (滴之后 -> 模拟结束)
+        end_animate : 3, // 当前模拟结束 (滴之后 -> 模拟结束)
         start_rest : 4, // 开始休息 (暂停中 -> 休息中)
         end_rest : 5, // 休息结束 (休息中 -> 暂停中)
         clicked : 6 // 在合法状态下用户点击了鼠标 (模拟结束 -> 暂停中)
@@ -91,13 +104,7 @@
         dr : Math.PI/4
     };
     
-    var Delays = [
-        0,
-        50,
-        100,
-        150,
-        200
-    ]
+    var Delays = [0, 50, 100, 150, 200];
     
     var DirKey = new Array();
     
@@ -154,25 +161,24 @@
                 idx_time[t_time] = tmp;
             
             }
-        }
-        
-            
-            var xx = [];
-            console.log(Delays.length);
-            
-            for (var i = 0; i < Delays.length; ++i)
-                xx[i] = 0;
-            
-            for (var each in g_delay) {
-                // console.log(g_delay[each]);
-                
-                ++xx[g_delay[each]];
-            }
-            
-            for (var each in xx)
-                console.log("time "+each+"\t"+xx[each]);
+        }        
     }
-        
+    
+    var testAlert = function(current, expect) {
+        if (expect != current){
+            alert("程序表现不是预期，请联系开发人员！");
+            return false;
+        }
+        return true;
+    }
+    
+    var dis_btn_start = function() {
+        document.getElementById("button").style.display = 'none';
+    }
+    
+    var ena_btn_start = function() {
+        document.getElementById("button").style.display = '';
+    }
     /**
      * 控制整个流程的函数，入口函数。每一个 loop 都以这个函数开始。
       */
@@ -181,13 +187,57 @@
     var g_accept_click = false; // 如果是真，则接受用户鼠标点击，否则不接受(不记录)。
     var clicked = false;
     var switch_state = function(transit) {
-        switch (Transition.transit) {
-        case start_animate: // 开始下一个模拟 (等待中 -> 模拟中)
-            if (g_state != State.paused)
-                alert("程序表现不是预期，请联系开发人员！");
+        switch (transit) {
+        case Transition.start_animate: // 开始下一个模拟 (等待中 -> 模拟中)
+            if (! testAlert(g_state, State.paused))
                 return;
+            
+            console.log(">>>>> loop "+(g_current+1));
             g_state = State.animating;
-            execute_sample(v, t);
+            dis_btn_start(); // 隐藏开始按钮
+            g_accept_click = false; // 禁止点击
+            clicked = false; // 设置新一轮点击
+            execute_sample(g_v, g_delay[g_current], Direction[g_order[g_current]]); // 开始执行
+            break;
+        case Transition.end_animate: // 模拟结束，等待用户点击
+            if (! testAlert(g_state, State.animating))
+                return;
+            
+            g_state = State.animated_wait;
+            clicked = false;
+            dis_btn_start();
+            g_accept_click = true;
+            break;
+        case Transition.clicked: // 用户点击，转入 pause
+            if (! testAlert(g_state, State.animated_wait))
+                return;
+
+            clicked = false;
+            g_accept_click = false;
+            ++g_current;
+            // 分支，如果达到值，则休息
+            if (g_current % g_rest == 0) {
+                dis_btn_start();
+                g_state = State.rest;
+                document.getElementById("rest_notice").style.display="";
+                setTimeout(function() {
+                    document.getElementById("rest_notice").style.display="none";
+                    switch_state(Transition.end_rest);
+                }, g_rest_time);
+            } else {
+                ena_btn_start();
+                g_state = State.paused;
+            }
+            break;
+        case Transition.end_rest:
+            if (! testAlert(g_state, State.rest))
+                return;            
+            
+            ena_btn_start();
+            g_state = State.paused;
+            clicked = false;
+            g_accept_click = false;
+            break;
         }
     }
     /**
@@ -201,11 +251,13 @@
      * 参数 beep: beep 结束后多久图形消失
      * 参数 direction: 位移方向，单位是 弧度。
      */
+    var g_entered = false;
     var animate = function(target, startx, starty, velocity, duration, beep, direction) {
         // 设置开始和结束值
+        animator.rewind();
         animator.setStartValue(0);
         animator.setEndValue(velocity*(duration+beep));
-        console.log("d "+duration+"\tl "+velocity*(duration+beep))
+        console.log("beep time "+beep+"\tdirection "+direction);
         // 把图形加入到界面
         panel.addElement(target);
         
@@ -229,7 +281,7 @@
             if (!beep && bx-1 <= x && x <= bx+1 && by-1<=y && y <= by+1) {
                 beep = true;
                 PlaySound("beep");
-                console.log(x+", "+y);
+                console.log("beep at \t"+x+", "+y);
             }
             target.setCenterX(x);
             target.setCenterY(y);
@@ -239,15 +291,16 @@
         var endListener = function() {
             // 移除每一个时间点执行的函数
             animator.removeStepListener(animateListener);
+            animator.removeEndListener(endListener);
             // 清屏
             panel.clear();
-            // 移除自己
-            animator.removeEndListener(endListener);
-            loop_controller(); // 回到主循环
+            switch_state(Transition.end_animate);
         }
+        
         
         animator.addStepListener(animateListener);
         animator.addEndListener(endListener);
+         
         return animateListener;
     }
     
@@ -273,20 +326,21 @@
      *
      * 参数 v 速度，设置速度，px/每秒。
      * 参数 t 时间，发出声音后多少毫秒圆球消失
+     * 参数 d 方向，圆环运动的方向
      */
-    var execute_sample = function(v, t) {
+    var execute_sample = function(v, t, d) {
         panel.clear(); // 清除界面
         
         var circle = create_circle();
         
-        var dir = parseInt(Math.random()*7+1);
-        
-        var animateCallback = animate(circle, 500, 500, v, Math.random()*1000+2000, t, Direction[DirKey[dir]]);
+        var animateCallback = animate(circle, g_x, g_y, v, Math.random()*g_duration_random+g_duration_const, t, d);
         animator.play();
     }
     
+    ena_btn_start();
     // execute_sample(0.1, 500);
     init();     
     </script>
+  </div>
   </body>
 </html>
