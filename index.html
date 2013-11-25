@@ -1,0 +1,219 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" 
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:vml="urn:schemas-microsoft-com:vml">
+    <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <title>JSGL empty page template</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=7" />
+    <!--[if vml]><style>vml\:* {behavior: url(#default#VML);}</style><![endif]-->
+    <script type="text/javascript" src="./jsgl.min.js"></script>
+    </head>
+    <body  onclick="getXY()">
+    <!-- 在这里设置界面的 高和宽 -->
+    <div id="panel" style="width: 1000px; height: 1000px""></div>
+
+    <audio src="beep.wav" autostart="false" width="0" height="0" id="beep" enablejavascript="true">
+    <script type="text/javascript">
+            
+    var g_time = 30; // 每个方向 30 次
+    var g_rest = 60; // 每 60 次休息一下
+    var g_order = new Array(); // 存 30*8 =240 次模拟的顺序
+    
+    /**
+     * 这必将成为一个耦合度极高，无法修改的代码
+     */
+     
+     /**
+      * 获取点击时的 x 和 y 坐标
+      */
+    var getXY = function(event) {
+        var e = event ? event:window.event;
+        var x;
+        var y;
+        if (e.pageX || e.pageY) { 
+          x = e.pageX;
+          y = e.pageY;
+        }
+        else { 
+          x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft; 
+          y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop; 
+        } 
+        // x -= gCanvasElement.offsetLeft;
+        // y -= gCanvasElement.offsetTop;
+        console.log("click "+x+", "+y);
+    }
+    var PlaySound =function(soundObj) {
+        var sound = document.getElementById(soundObj);
+        sound.play();
+    }
+    /* Instantiate JSGL Panel. */
+    var panel = new jsgl.Panel(document.getElementById("panel"));
+    var animator = new jsgl.util.Animator();
+    /**
+     * 状态，代表当前程序状态的量
+     */
+    var State = {
+        paused : 0, // 暂停中
+        animating_before : 1, // 模拟中 - 滴之前
+        animating_after : 2, // 模拟中 - 滴之后
+        animated_wait : 3, // 模拟结束 - 等待用户按鼠标
+    };
+    /**
+     * 方向，是某个方向对应的弧度
+     */
+    var Direction = {
+        up : -Math.PI/2,
+        dw : Math.PI/2,
+        le : Math.PI,
+        ri : 0,
+        ul : -Math.PI*3/4,
+        ur : +Math.PI/4,
+        dl : Math.PI*3/4,
+        dr : Math.PI/4
+    };
+    
+    var DirKey = new Array();
+    
+    for (var key in Direction) 
+        DirKey.push(key);
+        
+    /**
+     * 初始化. 初始化 240 个 case 的顺序
+     */
+    var init = function() {
+        g_order = []; // 清除上一次的数据
+        var left = 8;
+        var fill = new Array();
+        var idx = new Array();
+
+        for (var i = 0; i < 8; ++i) { // 8 directions
+            fill[i] = g_time;
+            idx[i] = i;
+        }
+        
+        var total = g_time * 8; // total time
+        // 将 每个 case 放入
+        for (var i = 0; i < total; ++i) {
+            var t = parseInt(Math.random()*left);
+            
+            g_order.push(DirKey[idx[t]]);
+            
+            if (--fill[idx[t]] == 0) {
+                // swap filled & last
+                var tmp = idx[--left];
+                idx[left] = idx[t];
+                idx[t] = tmp;
+            }
+        }
+    }
+        
+    /**
+     * 控制整个流程的函数，入口函数。每一个 loop 都以这个函数开始。
+      */
+    var g_current = 0; // 当前 case
+    var accept_click = false; // 如果是真，则接受用户鼠标点击，否则不接受(不记录)。
+    var loop_controller = function() {
+        
+    }
+    /**
+     * 一次模拟动作，将 target 图形从 (startx, starty) 坐标经过 duration 的时间 往 direction 方向上位移 length 的距离
+     *
+     * 参数 target: 目标图形
+     * 参数 startx: 初始位置 x 坐标
+     * 参数 starty: 初始位置 y 坐标
+     * 参数 velocity: 位移速度 (px/ms)
+     * 参数 duration: 位移时间(ms)
+     * 参数 beep: beep 结束后多久图形消失
+     * 参数 direction: 位移方向，单位是 弧度。
+     */
+    var animate = function(target, startx, starty, velocity, duration, beep, direction) {
+        // 设置开始和结束值
+        animator.setStartValue(0);
+        animator.setEndValue(velocity*(duration+beep));
+        console.log("d "+duration+"\tl "+velocity*(duration+beep))
+        // 把图形加入到界面
+        panel.addElement(target);
+        
+        // 设置持续时间
+        animator.setDuration(duration);
+        
+        var dx = Math.cos(direction);
+        var dy = Math.sin(direction);
+        var bx = parseInt(startx + dx*(velocity*duration));
+        var by = parseInt(starty + dy*(velocity*duration));
+        // console.log(bx + ", "+by);
+        animator.setFps(60);
+        var beep = false;
+        
+        // 设置每一个时间点的新位置 
+        var animateListener = function(t) {
+            var x = parseInt(startx + t*dx);
+            var y = parseInt(starty + t*dy);
+            
+            // console.log(x+"\t"+y);
+            if (!beep && bx-1 <= x && x <= bx+1 && by-1<=y && y <= by+1) {
+                beep = true;
+                PlaySound("beep");
+                console.log(x+", "+y);
+            }
+            target.setCenterX(x);
+            target.setCenterY(y);
+        }
+        
+        // 结束后销毁 animation
+        var endListener = function() {
+            // 移除每一个时间点执行的函数
+            animator.removeStepListener(animateListener);
+            // 清屏
+            panel.clear();
+            // 移除自己
+            animator.removeEndListener(endListener);
+            loop_controller(); // 回到主循环
+        }
+        
+        animator.addStepListener(animateListener);
+        animator.addEndListener(endListener);
+        return animateListener;
+    }
+    
+    /**
+     * 产生一个圆, 并返回这个圆。但不在界面上显示它
+     *
+     * 返回值 圆
+     */
+    var create_circle = function() {
+        /* Create circle and modify it */
+        circle = panel.createCircle();
+        // 设置半径
+        circle.setRadius(4);
+        // 设置边的厚度
+        circle.getStroke().setWeight(2);
+        // 设置颜色
+        circle.getStroke().setColor("rgb(255,0,0)");
+        return circle;
+    }
+    
+    /**
+     * 执行一次，收集用户的一个点击。
+     *
+     * 参数 v 速度，设置速度，px/每秒。
+     * 参数 t 时间，发出声音后多少毫秒圆球消失
+     */
+    var execute_sample = function(v, t) {
+        panel.clear(); // 清除界面
+        
+        var circle = create_circle();
+        
+        var dir = parseInt(Math.random()*7+1);
+        
+        var animateCallback = animate(circle, 500, 500, v, Math.random()*1000+2000, t, Direction[DirKey[dir]]);
+        animator.play();
+    }
+    
+    // execute_sample(0.1, 500);
+    init();     
+    </script>
+  </body>
+</html>
