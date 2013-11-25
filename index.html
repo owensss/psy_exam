@@ -20,6 +20,7 @@
     var g_time = 30; // 每个方向 30 次
     var g_rest = 60; // 每 60 次休息一下
     var g_order = new Array(); // 存 30*8 =240 次模拟的顺序
+    var g_delays = new Array();
     
     /**
      * 这必将成为一个耦合度极高，无法修改的代码
@@ -42,7 +43,12 @@
         } 
         // x -= gCanvasElement.offsetLeft;
         // y -= gCanvasElement.offsetTop;
-        console.log("click "+x+", "+y);
+        if (g_accept_click && g_state == State.animated_wait) {
+            console.log("click "+g_current+"\t"+x+", "+y); // 写入
+            g_accept_click = false; // 拒绝用户再次点击
+            loop_controller(); // 处理完事情了，把控制权交给 loop_controller
+
+        }
     }
     var PlaySound =function(soundObj) {
         var sound = document.getElementById(soundObj);
@@ -55,10 +61,21 @@
      * 状态，代表当前程序状态的量
      */
     var State = {
-        paused : 0, // 暂停中
-        animating_before : 1, // 模拟中 - 滴之前
-        animating_after : 2, // 模拟中 - 滴之后
+        paused : 0, // 暂停中，等待用户点击开始按钮
+        animating : 1, // 模拟中
         animated_wait : 3, // 模拟结束 - 等待用户按鼠标
+        rest : 4, // 休息中，等待中。强制 1 min 休息
+    };
+    
+    /**
+     * 状态改变，代表程序状态改变的量
+     */
+    var Transition = {
+        start_animate : 0, // 开始下一个模拟 (等待中 -> 模拟中)
+        end_loop : 3, // 当前模拟结束 (滴之后 -> 模拟结束)
+        start_rest : 4, // 开始休息 (暂停中 -> 休息中)
+        end_rest : 5, // 休息结束 (休息中 -> 暂停中)
+        clicked : 6 // 在合法状态下用户点击了鼠标 (模拟结束 -> 暂停中)
     };
     /**
      * 方向，是某个方向对应的弧度
@@ -74,31 +91,54 @@
         dr : Math.PI/4
     };
     
+    var Delays = [
+        0,
+        50,
+        100,
+        150,
+        200
+    ]
+    
     var DirKey = new Array();
     
     for (var key in Direction) 
         DirKey.push(key);
         
     /**
-     * 初始化. 初始化 240 个 case 的顺序
+     * 初始化. 初始化 240 个 case 的顺序以及延时（小球多久消失）
      */
     var init = function() {
         g_order = []; // 清除上一次的数据
+        g_delay = [];
         var left = 8;
+        var left_time = Delays.length;
         var fill = new Array();
+        var fill_time = new Array();
+       
         var idx = new Array();
+        var idx_time = new Array();
+        
+        var total = g_time * 8; // total time
 
+        
         for (var i = 0; i < 8; ++i) { // 8 directions
             fill[i] = g_time;
             idx[i] = i;
         }
         
-        var total = g_time * 8; // total time
+        for (var i = 0; i < Delays.length; ++i) {
+            // plz. make sure the result is integer orz..
+            fill_time[i] = total / Delays.length;
+            idx_time[i] = i;
+        }
+        
         // 将 每个 case 放入
         for (var i = 0; i < total; ++i) {
             var t = parseInt(Math.random()*left);
+            var t_time = parseInt(Math.random()*left_time);
             
             g_order.push(DirKey[idx[t]]);
+            g_delay.push(idx_time[t_time]);
             
             if (--fill[idx[t]] == 0) {
                 // swap filled & last
@@ -106,16 +146,49 @@
                 idx[left] = idx[t];
                 idx[t] = tmp;
             }
+            
+            if (--fill_time[idx_time[t_time]] == 0) {
+                // swap filled & last
+                var tmp = idx_time[--left_time];
+                idx_time[left_time] = idx_time[t_time];
+                idx_time[t_time] = tmp;
+            
+            }
         }
+        
+            
+            var xx = [];
+            console.log(Delays.length);
+            
+            for (var i = 0; i < Delays.length; ++i)
+                xx[i] = 0;
+            
+            for (var each in g_delay) {
+                // console.log(g_delay[each]);
+                
+                ++xx[g_delay[each]];
+            }
+            
+            for (var each in xx)
+                console.log("time "+each+"\t"+xx[each]);
     }
         
     /**
      * 控制整个流程的函数，入口函数。每一个 loop 都以这个函数开始。
       */
     var g_current = 0; // 当前 case
-    var accept_click = false; // 如果是真，则接受用户鼠标点击，否则不接受(不记录)。
-    var loop_controller = function() {
-        
+    var g_state = State.paused; // 等待
+    var g_accept_click = false; // 如果是真，则接受用户鼠标点击，否则不接受(不记录)。
+    var clicked = false;
+    var switch_state = function(transit) {
+        switch (Transition.transit) {
+        case start_animate: // 开始下一个模拟 (等待中 -> 模拟中)
+            if (g_state != State.paused)
+                alert("程序表现不是预期，请联系开发人员！");
+                return;
+            g_state = State.animating;
+            execute_sample(v, t);
+        }
     }
     /**
      * 一次模拟动作，将 target 图形从 (startx, starty) 坐标经过 duration 的时间 往 direction 方向上位移 length 的距离
