@@ -20,12 +20,12 @@
     <audio src="beep.wav" autostart="false" width="0" height="0" id="beep" enablejavascript="true">
     <script type="text/javascript">
     
-    var g_rest_time = 6000 ;// 60 * 100000; // 每次休息 60秒
+    var g_rest_time = 60 * 1000; // 每次休息 60秒
     var g_v = 0.1; // 速度
     var g_duration_random = 500; // 在鸣笛前小球先 运动(0, 1000) 微秒，加上
     var g_duration_const  = 3000; // 在鸣笛前小球固定运动 3000 微秒
     var g_time = 30; // 每个方向 30 次
-    var g_rest = 2 // 60; // 每 60 次休息一下
+    var g_rest = 60; // 每 60 次休息一下
     var g_order = new Array(); // 存 30*8 =240 次模拟的顺序
     var g_delays = new Array(); // 存每次模拟的时间
     var g_x = 500; // 小球运动起点 x 坐标 (px)
@@ -345,7 +345,7 @@
         
         var circle = create_circle();
         
-        var animateCallback = animate(circle, g_x, g_y, v, Math.random()*g_duration_random+g_duration_const, t, d);
+        var animateCallback = animate(circle, g_x, g_y, v, Math.random()*g_duration_random+g_duration_const, Delays[t], d);
         animator.play();
     }
     
