@@ -14,6 +14,7 @@
     <!-- 在这里设置界面的 高和宽 -->
     <button type="button" id="button" onclick="btn_start()">开始</button>
     <div id="rest_notice" style="display:none">请休息一下，一分钟后再开始</div>
+    <div id="end_notice" style="display:none">测试结束，请不要关闭或刷新本窗口</div>
     <div onclick="getXY()">
     <div id="panel" style="width: 1000px; height: 1000px""></div>
     <audio src="beep.wav" autostart="false" width="0" height="0" id="beep" enablejavascript="true">
@@ -215,6 +216,17 @@
             clicked = false;
             g_accept_click = false;
             ++g_current;
+            
+            // 测试结束
+            if (g_current == g_time*8) {
+                document.getElementById("end_notice").style.display="";
+                dis_btn_start();
+                document.getElementById("rest_notice").style.display="none";
+                g_accept_click = false;
+                clicked = true;
+                break;
+            }
+            
             // 分支，如果达到值，则休息
             if (g_current % g_rest == 0) {
                 dis_btn_start();
