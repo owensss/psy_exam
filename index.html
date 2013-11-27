@@ -9,6 +9,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=7" />
     <!--[if vml]><style>vml\:* {behavior: url(#default#VML);}</style><![endif]-->
     <script type="text/javascript" src="./jsgl.min.js"></script>
+    <script type="text/javascript" src="keymaster.js"></script>
     </head>
     <body>
     <!-- 在这里设置界面的 高和宽 -->
@@ -31,6 +32,10 @@
     var g_x = 500; // 小球运动起点 x 坐标 (px)
     var g_y = 500; // 小球运动起点 y 坐标 (px)
     
+    /**
+     * 设置热键
+     */
+    key('s', function(){ btn_start(); });
     /**
      * 这必将成为一个耦合度极高，无法修改的代码
      */
@@ -61,7 +66,8 @@
     }
     
     var btn_start = function() {
-        switch_state(Transition.start_animate);
+        if (document.getElementById("button").style['display'] != 'none')
+            switch_state(Transition.start_animate);
     }
     
     var PlaySound =function(soundObj) {
